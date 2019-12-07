@@ -18,14 +18,20 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// log is for logging in this package.
-var eventloggerlog = logf.Log.WithName("eventlogger-resource")
+var (
+	// log is for logging in this package.
+	eventloggerlog = logf.Log.WithName("eventlogger-resource")
+	cl             client.Client
+)
 
+// SetupWebhookWithManager setup webhook
 func (r *EventLogger) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	cl = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
