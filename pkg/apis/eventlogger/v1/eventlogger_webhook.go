@@ -31,11 +31,18 @@ func (r *EventLogger) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// +kubebuilder:webhook:path=/mutate-eventlogger-bakito-ch-v1-eventlogger,mutating=true,failurePolicy=fail,groups=webapp.my.domain,resources=guestbooks,verbs=create;update,versions=v1,name=mguestbook.kb.io
+var _ webhook.Defaulter = &EventLogger{}
+
+// Default implements webhook.Defaulter so a webhook will be registered for the type
+func (r *EventLogger) Default() {
+	eventloggerlog.Info("default", "name", r.Name)
+
+	// TODO(user): fill in your defaulting logic.
+}
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:verbs=create;update,path=/validate-eventlogger-bakito-ch-my-domain-v1-eventlogger,mutating=false,failurePolicy=fail,groups=eventlogger.bakito.ch.my.domain,resources=eventloggers,versions=v1,name=veventlogger.kb.io
-
+// +kubebuilder:webhook:verbs=create;update,path=/validate-eventlogger-bakito-ch-v1-eventlogger,mutating=false,failurePolicy=fail,groups=webapp.my.domain,resources=eventLoggers,versions=v1,name=veventLogger.kb.io
 var _ webhook.Validator = &EventLogger{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type

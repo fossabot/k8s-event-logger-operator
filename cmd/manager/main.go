@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/bakito/k8s-event-logger-operator/pkg/apis"
+	eventloggerv1 "github.com/bakito/k8s-event-logger-operator/pkg/apis/eventlogger/v1"
 	c "github.com/bakito/k8s-event-logger-operator/pkg/constants"
 	"github.com/bakito/k8s-event-logger-operator/pkg/controller"
 	"github.com/bakito/k8s-event-logger-operator/version"
@@ -87,6 +88,8 @@ func main() {
 		Namespace:          "",
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", c.MetricsHost, c.MetricsPort),
+		// Webhook port
+		Port: 8443,
 	})
 	if err != nil {
 		log.Error(err, "")
@@ -133,6 +136,12 @@ func main() {
 		if err == metrics.ErrServiceMonitorNotPresent {
 			log.Info("Install prometheus-operator in your cluster to create ServiceMonitor objects", "error", err.Error())
 		}
+	}
+
+	// Setup webhooks
+	if err = (&eventloggerv1.EventLogger{}).SetupWebhookWithManager(mgr); err != nil {
+		log.Error(err, "unable to create webhook", "webhook", "EventLogger")
+		os.Exit(1)
 	}
 
 	log.Info("Starting the Cmd.")
