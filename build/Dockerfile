@@ -11,12 +11,11 @@ ENV GOPROXY=https://goproxy.io \
     GOOS=linux \
     GOARCH=amd64
 RUN go test ./...
-RUN go build -a -installsuffix cgo -ldflags="-w -s" -o k8s-event-logger-operator cmd/manager/main.go && \
-    upx --ultra-brute -q k8s-event-logger-operator
+RUN ./build/build.sh k8s-event-logger-operator cmd/manager/main.go
+
 
 # application image
-
-FROM scratch
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 WORKDIR /opt/go
 
 LABEL maintainer="bakito <github@bakito.ch>"
