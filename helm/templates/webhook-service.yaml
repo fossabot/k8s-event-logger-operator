@@ -1,0 +1,20 @@
+{{- if .Values.webhook.service -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-event-logger-operator.fullname" . }}-webhook
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name : {{ include "k8s-event-logger-operator.fullname" . }}-webhook
+  labels:
+    {{- include "k8s-event-logger-operator.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: webhook
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
+  selector:
+    {{- include "k8s-event-logger-operator.selectorLabels" . | nindent 4 }}
+  sessionAffinity: None
+  type: ClusterIP
+{{- end -}}

@@ -22,9 +22,15 @@ const (
 	// MetricsHost host for the metrics
 	MetricsHost = "0.0.0.0"
 
+	// WebhookHost host for the webhook
+	WebhookHost = MetricsHost
+
 	// MetricsPort port for the metrics
 	MetricsPort int32 = 8383
 
 	// OperatorMetricsPort port for the operator metrics
 	OperatorMetricsPort int32 = 8686
+
+	// WebhookPort port for the webhook
+	WebhookPort int = 8443
 )

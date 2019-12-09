@@ -49,6 +49,9 @@ spec:
               value: "{{ .Values.eventLogger.resources.limits.memory }}"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: webhook-certs
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -61,3 +64,8 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      volumes:
+        - name: webhook-certs
+          secret:
+            defaultMode: 420
+            secretName: {{ include "k8s-event-logger-operator.fullname" . }}-webhook

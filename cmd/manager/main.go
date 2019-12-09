@@ -89,7 +89,8 @@ func main() {
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", c.MetricsHost, c.MetricsPort),
 		// Webhook port
-		Port: 8443,
+		Port: c.WebhookPort,
+		Host: c.WebhookHost,
 	})
 	if err != nil {
 		log.Error(err, "")
@@ -118,7 +119,9 @@ func main() {
 	servicePorts := []v1.ServicePort{
 		{Port: c.MetricsPort, Name: metrics.OperatorPortName, Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: c.MetricsPort}},
 		{Port: c.OperatorMetricsPort, Name: metrics.CRPortName, Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: c.OperatorMetricsPort}},
+		{Port: int32(c.WebhookPort), Name: "webhook", Protocol: v1.ProtocolTCP, TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: int32(c.WebhookPort)}},
 	}
+
 	// Create Service object to expose the metrics port(s).
 	service, err := metrics.CreateMetricsService(ctx, cfg, servicePorts)
 	if err != nil {
