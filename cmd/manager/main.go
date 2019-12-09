@@ -83,14 +83,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	webhookCertDir := ""
+	if dir, ok := os.LookupEnv(c.EnvWebhookCertDir); ok {
+		webhookCertDir = dir
+	}
+
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          "",
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", c.MetricsHost, c.MetricsPort),
 		// Webhook port
-		Port: c.WebhookPort,
-		Host: c.WebhookHost,
+		Port:    c.WebhookPort,
+		Host:    c.WebhookHost,
+		CertDir: webhookCertDir,
 	})
 	if err != nil {
 		log.Error(err, "")

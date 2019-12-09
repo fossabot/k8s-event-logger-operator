@@ -56,3 +56,4 @@ affinity: {}
 webhook:
   service:
     create: true
+    certDir: /tmp/k8s-webhook-server/serving-certs

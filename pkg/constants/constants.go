@@ -3,6 +3,8 @@ package constants
 const (
 	// EnvConfigFilePath env variable name for config path
 	EnvConfigFilePath = "CONFIG_PATH"
+	// EnvWebhookCertDir cert dir for webhook
+	EnvWebhookCertDir = "WEBHOOK_CERT_DIR"
 
 	// EnvEventLoggerImage env variable name for the image if the event logger
 	EnvEventLoggerImage = "EVENT_LOGGER_IMAGE"

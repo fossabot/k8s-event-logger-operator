@@ -47,11 +47,13 @@ spec:
               value: "{{ .Values.eventLogger.resources.limits.cpu }}"
             - name: LOGGER_POD_LIMIT_MEM
               value: "{{ .Values.eventLogger.resources.limits.memory }}"
+            - name: WEBHOOK_CERT_DIR
+              value: "{{ .Values.webhook.service.certDir }}"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - mountPath: /tmp/k8s-webhook-server/serving-certs
-              name: webhook-certs
+            - name: webhook-certs
+              mountPath: {{ .Values.webhook.service.certDir }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
