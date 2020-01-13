@@ -3,5 +3,8 @@ kind: EventLogger
 metadata:
   name: example-eventlogger
 spec:
+  eventTypes:
+    - Warning
   kinds:
-    - name: DeploymentConfig
+    - name: ConfigMap
+    - name: Pod
