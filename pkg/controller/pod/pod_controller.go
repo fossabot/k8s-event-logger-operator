@@ -1,4 +1,4 @@
-package eventlogger
+package pod
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	eventloggerv1 "github.com/bakito/k8s-event-logger-operator/pkg/apis/eventlogger/v1"
 	c "github.com/bakito/k8s-event-logger-operator/pkg/constants"
-	"github.com/bakito/k8s-event-logger-operator/version"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -28,17 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sigs.k8s.io/yaml"
-)
-
-const (
-	elConfigFileName    = "event-listener.conf"
-	elAbsConfigDirPath  = "/opt/go/config"
-	elAbsConfigFilePath = elAbsConfigDirPath + "/" + elConfigFileName
 )
 
 var (
-	log                    = logf.Log.WithName("controller_eventlogger")
+	log                    = logf.Log.WithName("controller_pod")
 	defaultFileMode  int32 = 420
 	gracePeriod      int64
 	eventLoggerImage = "quay.io/bakito/k8s-event-logger"
@@ -51,11 +43,11 @@ var (
 // Add creates a new EventLogger Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	return add(mgr, newReconciler(mgr.GetClient(), mgr.GetScheme()))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(client client.Client, scheme *runtime.Scheme) reconcile.Reconciler {
 
 	if podImage, ok := os.LookupEnv(c.EnvEventLoggerImage); ok {
 		eventLoggerImage = podImage
@@ -73,13 +65,13 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		podMaxMem = resource.MustParse(mem)
 	}
 
-	return &ReconcileEventLogger{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileEventLogger{client: client, scheme: scheme}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("eventlogger-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("pod-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -146,20 +138,6 @@ func (r *ReconcileEventLogger) Reconcile(request reconcile.Request) (reconcile.R
 
 	// TODO check for changes and abort if error
 
-	sec, err := secretForCR(cr)
-	// Check if this Secret already exists
-	secChanged, err := r.createOrReplace(cr, sec, reqLogger, func(curr runtime.Object, next runtime.Object) updateReplace {
-		o1 := curr.(*corev1.Secret)
-		o2 := next.(*corev1.Secret)
-		if reflect.DeepEqual(o1.Data, o2.Data) {
-			return no
-		}
-		return update
-	})
-	if err != nil {
-		return r.updateCR(cr, reqLogger, err)
-	}
-
 	var saccChanged, roleChanged, rbChanged bool
 
 	sacc, role, rb := rbacForCR(cr)
@@ -214,12 +192,12 @@ func (r *ReconcileEventLogger) Reconcile(request reconcile.Request) (reconcile.R
 	// Define a new Pod object
 	pod := podForCR(cr)
 	// Check if this Pod already exists
-	podChanged, err := r.createOrReplacePod(cr, pod, reqLogger, secChanged)
+	podChanged, err := r.createOrReplacePod(cr, pod, reqLogger)
 	if err != nil {
 		return r.updateCR(cr, reqLogger, err)
 	}
 
-	if secChanged || saccChanged || roleChanged || rbChanged || podChanged {
+	if saccChanged || roleChanged || rbChanged || podChanged {
 		return r.updateCR(cr, reqLogger, nil)
 	}
 
@@ -227,7 +205,7 @@ func (r *ReconcileEventLogger) Reconcile(request reconcile.Request) (reconcile.R
 }
 
 func (r *ReconcileEventLogger) createOrReplacePod(cr *eventloggerv1.EventLogger, pod *corev1.Pod,
-	reqLogger logr.Logger, replace bool) (bool, error) {
+	reqLogger logr.Logger) (bool, error) {
 
 	podList := &corev1.PodList{}
 	opts := []client.ListOption{
@@ -243,12 +221,12 @@ func (r *ReconcileEventLogger) createOrReplacePod(cr *eventloggerv1.EventLogger,
 	}
 
 	replacePod := false
-	if !replace && len(podList.Items) == 1 {
+	if len(podList.Items) == 1 {
 		op := podList.Items[0]
 		replacePod = podChanged(&op, pod)
 	}
 
-	if replace || replacePod || len(podList.Items) > 1 {
+	if replacePod || len(podList.Items) > 1 {
 
 		for _, p := range podList.Items {
 			reqLogger.Info(fmt.Sprintf("Deleting %s", pod.Kind), "Namespace", pod.GetNamespace(), "Name", pod.GetName())
@@ -332,16 +310,7 @@ func (r *ReconcileEventLogger) createOrReplace(cr *eventloggerv1.EventLogger,
 }
 
 func (r *ReconcileEventLogger) updateCR(cr *eventloggerv1.EventLogger, logger logr.Logger, err error) (reconcile.Result, error) {
-	if err != nil {
-		logger.Error(err, "")
-		cr.Status.Error = err.Error()
-	} else {
-		cr.Status.Error = ""
-	}
-	cr.Status.LastProcessed = metav1.Now()
-	cr.Status.OperatorVersion = version.Version
-
-	updErr := r.client.Update(context.TODO(), cr)
+	updErr := cr.UpdateStatus(logger, err, r.client)
 	return reconcile.Result{}, updErr
 }
 
@@ -359,8 +328,8 @@ func podForCR(cr *eventloggerv1.EventLogger) *corev1.Pod {
 		annotations[k] = v
 	}
 	if cr.Spec.ScrapeMetrics != nil && *cr.Spec.ScrapeMetrics {
-		labels["prometheus.io/port"] = string(c.MetricsPort)
-		labels["prometheus.io/scrape"] = "true"
+		annotations["prometheus.io/port"] = string(c.MetricsPort)
+		annotations["prometheus.io/scrape"] = "true"
 	}
 
 	watchNamespace := cr.GetNamespace()
@@ -405,18 +374,12 @@ func podForCR(cr *eventloggerv1.EventLogger) *corev1.Pod {
 							},
 						},
 						{
-							Name:  c.EnvConfigFilePath,
-							Value: elAbsConfigFilePath,
+							Name:  c.EnvConfigName,
+							Value: cr.Name,
 						},
 						{
 							Name:  "DEBUG_CONFIG",
 							Value: "false",
-						},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "config",
-							MountPath: elAbsConfigDirPath,
 						},
 					},
 					Resources: corev1.ResourceRequirements{
@@ -431,52 +394,10 @@ func podForCR(cr *eventloggerv1.EventLogger) *corev1.Pod {
 					},
 				},
 			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "config",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							DefaultMode: &defaultFileMode,
-							SecretName:  loggerName(cr),
-							Items: []corev1.KeyToPath{
-								{
-									Key:  elConfigFileName,
-									Path: elConfigFileName,
-								},
-							},
-						},
-					},
-				},
-			},
 			ServiceAccountName: saccName,
 		},
 	}
 	return pod
-}
-
-func secretForCR(cr *eventloggerv1.EventLogger) (*corev1.Secret, error) {
-
-	conf, err := yaml.Marshal(cr.Spec.EventLoggerConf)
-	if err != nil {
-		return nil, err
-	}
-	sec := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loggerName(cr),
-			Namespace: cr.Namespace,
-			Labels: map[string]string{
-				"app": loggerName(cr),
-			},
-		},
-		Type: "github.com/bakito/k8s-event-logger-operator",
-		Data: map[string][]byte{
-			elConfigFileName: conf,
-		},
-	}
-	return sec, nil
 }
 
 func rbacForCR(cr *eventloggerv1.EventLogger) (*corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding) {
@@ -586,6 +507,9 @@ func loggerName(cr *eventloggerv1.EventLogger) string {
 
 func podChanged(old, new *corev1.Pod) bool {
 	if old.Spec.ServiceAccountName != new.Spec.ServiceAccountName {
+		return true
+	}
+	if len(old.Spec.Containers) > 0 && len(new.Spec.Containers) > 0 && old.Spec.Containers[0].Image != new.Spec.Containers[0].Image {
 		return true
 	}
 

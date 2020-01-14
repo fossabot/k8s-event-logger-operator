@@ -4,8 +4,10 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
-	github.com/go-openapi/spec v0.19.2
-	github.com/operator-framework/operator-sdk v0.13.0
+	github.com/go-openapi/spec v0.19.4
+	github.com/golang/mock v1.3.1
+	github.com/google/go-cmp v0.3.1
+	github.com/operator-framework/operator-sdk v0.14.0
 	github.com/spf13/pflag v1.0.5
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.0.0
@@ -14,7 +16,6 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20190918143330-0270cf2f1c1d
 	sigs.k8s.io/controller-runtime v0.4.0
-	sigs.k8s.io/yaml v1.1.0
 )
 
 // Pinned to kubernetes-1.16.2
@@ -41,3 +42,5 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20191016113814-3b1a734dba6e
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20191016112829-06bb3c9d77c9
 )
+
+replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
